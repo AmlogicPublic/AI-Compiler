@@ -77,6 +77,8 @@ def compile_stage_to_vmfb(
         mlir_bytes = f.read()
 
     extra_args = []
+    if target_backend == "llvm-cpu":
+        extra_args.append("--iree-llvmcpu-target-cpu=host")
     if low_memory_mode:
         extra_args.append("--mlir-disable-threading")
         extra_args.append("--iree-stream-partitioning-favor=min-peak-memory")

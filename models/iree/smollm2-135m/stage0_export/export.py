@@ -1,10 +1,15 @@
+import logging
 import sys
 import warnings
 from pathlib import Path
 
+# Suppress third-party library warnings
 warnings.filterwarnings("ignore", module="torch._dynamo")
 warnings.filterwarnings("ignore", module="torch._export")
 warnings.filterwarnings("ignore", category=FutureWarning, module="copyreg")
+
+# Suppress torch logging warnings (Dim.AUTO specialization)
+logging.getLogger("torch._export.non_strict_utils").setLevel(logging.ERROR)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 MODELS_ROOT = REPO_ROOT

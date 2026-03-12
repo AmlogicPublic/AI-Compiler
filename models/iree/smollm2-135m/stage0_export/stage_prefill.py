@@ -5,6 +5,26 @@ import torch
 from stage_common import flatten_kv_cache, get_text_model_dims
 
 
+def make_4d_causal_mask(attention_mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """
+    Create a 4D causal attention mask from a 2D padding mask.
+    4D mask bypasses transformers' masking_utils and avoids unsupported bool & ops.
+    
+    Returns: (batch, 1, seq_len, seq_len) float mask where 0.0=attend, -inf=ignore
+    """
+    batch_size, seq_len = attention_mask.shape
+    # Causal mask: lower triangular
+    causal = torch.tril(torch.ones(seq_len, seq_len, dtype=dtype, device=attention_mask.device))
+    # Expand to (1, 1, seq, seq)
+    causal = causal.unsqueeze(0).unsqueeze(0)
+    # Padding mask: (batch, 1, 1, seq) - which positions are valid
+    padding = attention_mask.unsqueeze(1).unsqueeze(2).to(dtype)
+    # Combine: (batch, 1, seq, seq)
+    combined = causal * padding
+    # Convert to additive mask: 0 -> -inf, 1 -> 0
+    return (1.0 - combined) * torch.finfo(dtype).min
+
+
 class PrefillStageWrapper(torch.nn.Module):
     """Prefill: prompt -> logits + flattened KV."""
 
@@ -13,9 +33,11 @@ class PrefillStageWrapper(torch.nn.Module):
         self.model = model
 
     def forward(self, input_ids, attention_mask):
+        # Create 4D causal mask to bypass transformers' masking_utils (avoids bool & op)
+        causal_mask_4d = make_4d_causal_mask(attention_mask, self.model.dtype)
         outputs = self.model(
             input_ids=input_ids,
-            attention_mask=attention_mask,
+            attention_mask=causal_mask_4d,
             use_cache=True,
             return_dict=True,
         )

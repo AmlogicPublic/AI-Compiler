@@ -15,6 +15,20 @@ def rebuild_kv_cache(num_layers: int, past_kv_flat: tuple[torch.Tensor, ...]) ->
     return DynamicCache(ddp_cache_data=cache_data)
 
 
+def make_4d_decode_mask(attention_mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """
+    Create a 4D attention mask for decode (single query token).
+    4D mask bypasses transformers' masking_utils and avoids unsupported bool & ops.
+    
+    attention_mask: (batch, kv_seq_len) - 2D padding mask
+    Returns: (batch, 1, 1, kv_seq_len) float mask where 0.0=attend, -inf=ignore
+    """
+    # (batch, 1, 1, kv_seq) - decode attends to all previous positions
+    mask_4d = attention_mask.unsqueeze(1).unsqueeze(2).to(dtype)
+    # Convert to additive mask: 0 -> -inf, 1 -> 0
+    return (1.0 - mask_4d) * torch.finfo(dtype).min
+
+
 class DecodeStageWrapper(torch.nn.Module):
     """Decode: 1 token + KV -> logits + new flattened KV."""
 
@@ -25,9 +39,11 @@ class DecodeStageWrapper(torch.nn.Module):
 
     def forward(self, input_ids, attention_mask, position_ids, cache_position, *past_kv_flat):
         cache = rebuild_kv_cache(self.num_layers, past_kv_flat)
+        # Create 4D mask to bypass transformers' masking_utils (avoids bool & op)
+        mask_4d = make_4d_decode_mask(attention_mask, self.model.dtype)
         outputs = self.model(
             input_ids=input_ids,
-            attention_mask=attention_mask,
+            attention_mask=mask_4d,
             position_ids=position_ids,
             cache_position=cache_position,
             past_key_values=cache,

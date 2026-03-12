@@ -86,7 +86,8 @@ class SmolLM2IREERunner:
 
     def prepare_inputs(self, prompt: str):
         """Prepare inputs for IREE inference"""
-        inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
+        # Must pad to 32 to match compiled prefill model shape
+        inputs = self.tokenizer(prompt, return_tensors="pt", padding="max_length", max_length=32)
         return {
             "input_ids": inputs["input_ids"].numpy(),
             "attention_mask": inputs["attention_mask"].numpy(),
@@ -125,6 +126,7 @@ class SmolLM2IREERunner:
         prompt: str,
         max_new_tokens: int = 64,
         temperature: float = 0.7,
+        stream: bool = False,
     ) -> str:
         """Generate response with KV cache"""
         inputs = self.prepare_inputs(prompt)
@@ -140,6 +142,10 @@ class SmolLM2IREERunner:
         generated_ids = []
         next_token = self.sample_next_token(logits, temperature)
         generated_ids.append(next_token)
+
+        if stream:
+            print("[Generated] ", end="", flush=True)
+            print(self.tokenizer.decode([next_token], skip_special_tokens=True), end="", flush=True)
 
         # Decode loop with KV cache
         if max_new_tokens > 1:
@@ -161,8 +167,13 @@ class SmolLM2IREERunner:
                 next_token = self.sample_next_token(logits, temperature)
                 generated_ids.append(next_token)
 
+                if stream:
+                    print(self.tokenizer.decode([next_token], skip_special_tokens=True), end="", flush=True)
+
             decode_time = time.perf_counter() - t0
             tokens_decoded = len(generated_ids) - 1
+            if stream:
+                print()  # newline after streaming
             if tokens_decoded > 0:
                 print(
                     f"  Decode: {decode_time:.2f}s, {tokens_decoded} tokens, "
@@ -198,12 +209,12 @@ def main():
             if not prompt:
                 continue
             print(f"\n[Prompt] {prompt}")
-            response = runner.generate(
+            runner.generate(
                 prompt,
                 max_new_tokens=MAX_NEW_TOKENS,
                 temperature=TEMPERATURE,
+                stream=True,
             )
-            print(f"[Generated] {response}")
         except KeyboardInterrupt:
             print("\nExit")
             break
