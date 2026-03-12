@@ -2,7 +2,6 @@ import sys
 import warnings
 from pathlib import Path
 
-# Suppress third-party library warnings
 warnings.filterwarnings("ignore", module="torch._dynamo")
 warnings.filterwarnings("ignore", module="torch._export")
 warnings.filterwarnings("ignore", category=FutureWarning, module="copyreg")
@@ -20,39 +19,39 @@ from stage_common import *
 from stage_decode import export_decode_stage_mlir
 from stage_prefill import export_prefill_stage_mlir
 
-"""Qwen3-VL-2B -> IREE export entrypoint.
+"""SmolLM2-135M -> IREE export entrypoint.
 Path: torch.export -> iree-turbine -> IREE vmfb
 """
 
 
 def main():
     print("=" * 60)
-    print("Qwen3-VL-2B -> IREE Export")
+    print("SmolLM2-135M -> IREE Export")
     print(f"  target: {TARGET_BACKEND}")
     print("=" * 60)
 
     print_export_limitations()
 
-    print("\n[1/7] Loading model...")
-    model, processor = load_model_and_processor(MODEL_NAME)
+    print("\n[1/6] Loading model...")
+    model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
 
-    print("\n[2/7] Creating example inputs...")
-    prefill_example_inputs = create_prefill_example_inputs(processor, IMAGE_SIZE)
+    print("\n[2/6] Creating example inputs...")
+    prefill_example_inputs = create_prefill_example_inputs(tokenizer)
 
     params_archive = COMPILED_DIR / PARAM_ARCHIVE_NAME
     if EXTERNALIZE_PARAMETERS:
-        print("\n[3/7] Externalizing model parameters...")
+        print("\n[3/6] Externalizing model parameters...")
         assert externalize_model_parameters(model, params_archive, PARAM_SCOPE)
     else:
         params_archive = None
 
     mlir_suffix = "mlirbc" if SAVE_MLIR_BYTECODE else "mlir"
 
-    print("\n[4/7] Exporting prefill to MLIR...")
+    print("\n[4/6] Exporting prefill to MLIR...")
     prefill_mlir_path = COMPILED_DIR / f"{PREFILL_STAGE_NAME}.{mlir_suffix}"
     assert export_prefill_stage_mlir(model, prefill_example_inputs, prefill_mlir_path)
 
-    print("\n[5/7] Exporting decode to MLIR...")
+    print("\n[5/6] Exporting decode to MLIR...")
     decode_mlir_path = COMPILED_DIR / f"{DECODE_STAGE_NAME}.{mlir_suffix}"
     assert export_decode_stage_mlir(
         model,
@@ -64,7 +63,7 @@ def main():
     prefill_vmfb_path = COMPILED_DIR / f"{PREFILL_STAGE_NAME}.vmfb"
     decode_vmfb_path = COMPILED_DIR / f"{DECODE_STAGE_NAME}.vmfb"
 
-    print("\n[6/7] Compiling prefill to IREE vmfb...")
+    print("\n[6/6] Compiling prefill to IREE vmfb...")
     assert compile_stage_to_vmfb(
         prefill_mlir_path,
         prefill_vmfb_path,
@@ -72,7 +71,7 @@ def main():
         low_memory_mode=IREE_LOW_MEMORY_MODE,
     )
 
-    print("\n[7/7] Compiling decode to IREE vmfb...")
+    print("\n[6/6] Compiling decode to IREE vmfb...")
     assert compile_stage_to_vmfb(
         decode_mlir_path,
         decode_vmfb_path,

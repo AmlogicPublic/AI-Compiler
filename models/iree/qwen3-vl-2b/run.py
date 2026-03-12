@@ -75,12 +75,10 @@ class Qwen3VLIREERunner:
 
         # Load decode module (1 token + KV cache → logits + new KV cache)
         decode_vmfb = COMPILED_DIR / "decode.vmfb"
-        if decode_vmfb.exists():
-            self.decode_ctx = load_iree_module(decode_vmfb)
-            self.decode_fn = self.decode_ctx.modules.module["main"]
-        else:
-            print(f"  Warning: {decode_vmfb} not found, decode disabled")
-            self.decode_fn = None
+        assert decode_vmfb.exists(
+        ), f"Run 'python export.py' first: {decode_vmfb}"
+        self.decode_ctx = load_iree_module(decode_vmfb)
+        self.decode_fn = self.decode_ctx.modules.module["main"]
 
         print("IREE runner ready")
 
@@ -162,7 +160,7 @@ class Qwen3VLIREERunner:
         generated_ids.append(next_token)
 
         # Decode loop with KV cache
-        if self.decode_fn is not None and max_new_tokens > 1:
+        if max_new_tokens > 1:
             t0 = time.perf_counter()
             for step in range(1, max_new_tokens):
                 if next_token == self.eos_token_id:
@@ -183,21 +181,9 @@ class Qwen3VLIREERunner:
             if tokens_decoded > 0:
                 print(f"  Decode: {decode_time:.2f}s, {tokens_decoded} tokens, "
                       f"{tokens_decoded/decode_time:.1f} tok/s")
-        elif max_new_tokens > 1 and self.decode_fn is None:
-            print("  Warning: decode.vmfb not found, only 1 token generated")
 
         response = self.tokenizer.decode(
             generated_ids, skip_special_tokens=True)
-        return response
-
-    def describe_image(self, image_path: str, question: str = "Describe this image."):
-        """Describe an image"""
-        image = Image.open(image_path).convert("RGB")
-        print(f"\n[Image] {image_path}")
-        print(f"[Question] {question}")
-        response = self.generate(
-            image, question, max_new_tokens=MAX_NEW_TOKENS, temperature=TEMPERATURE)
-        print(f"[Response] {response}")
         return response
 
 
@@ -230,7 +216,12 @@ def main():
 
     # Run inference
     image_path = IMAGE_PATH if IMAGE_PATH else demo_img
-    runner.describe_image(image_path, QUESTION)
+    image = Image.open(image_path).convert("RGB")
+    print(f"\n[Image] {image_path}")
+    print(f"[Question] {QUESTION}")
+    response = runner.generate(
+        image, QUESTION, max_new_tokens=MAX_NEW_TOKENS, temperature=TEMPERATURE)
+    print(f"[Response] {response}")
 
     # Interactive mode
     print("\n" + "=" * 60)
@@ -258,7 +249,12 @@ def main():
             else:
                 question = inp
 
-            runner.describe_image(current_image, question)
+            image = Image.open(current_image).convert("RGB")
+            print(f"\n[Image] {current_image}")
+            print(f"[Question] {question}")
+            response = runner.generate(
+                image, question, max_new_tokens=MAX_NEW_TOKENS, temperature=TEMPERATURE)
+            print(f"[Response] {response}")
 
         except KeyboardInterrupt:
             print("\nExit")

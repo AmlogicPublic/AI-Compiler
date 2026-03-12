@@ -4,7 +4,6 @@ import sys
 import time
 from pathlib import Path
 
-from PIL import Image
 import torch
 
 MODELS_ROOT = Path(__file__).resolve().parents[3]
@@ -13,12 +12,14 @@ sys.path.insert(0, str(MODELS_ROOT))
 from run.shared import download_model
 
 
-def load_model_and_processor(model_name: str):
-    from transformers import AutoModelForImageTextToText, AutoProcessor
+def load_model_and_tokenizer(model_name: str):
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
     local_dir = download_model(model_name)
-    processor = AutoProcessor.from_pretrained(local_dir, trust_remote_code=True)
-    model = AutoModelForImageTextToText.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(local_dir, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(
         local_dir,
         trust_remote_code=True,
         dtype=torch.float32,
@@ -26,26 +27,17 @@ def load_model_and_processor(model_name: str):
     )
     model.eval()
     print(f"Model loaded, params: {sum(p.numel() for p in model.parameters()):,}")
-    return model, processor
+    return model, tokenizer
 
 
-def create_prefill_example_inputs(processor, image_size: int):
-    image = Image.new("RGB", (image_size, image_size), color=(127, 127, 127))
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": "Describe this image."},
-            ],
-        }
-    ]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    return processor(text=[text], images=[image], return_tensors="pt", padding=True)
+def create_prefill_example_inputs(tokenizer, seq_len: int = 32):
+    prompt = "The quick brown fox jumps over"
+    inputs = tokenizer(prompt, return_tensors="pt", padding="max_length", max_length=seq_len)
+    return inputs
 
 
 def get_text_model_dims(model):
-    config = model.config.text_config
+    config = model.config
     num_layers = config.num_hidden_layers
     num_kv_heads = getattr(config, "num_key_value_heads", config.num_attention_heads)
     head_dim = config.hidden_size // config.num_attention_heads
@@ -54,8 +46,9 @@ def get_text_model_dims(model):
 
 def flatten_kv_cache(past_key_values) -> list[torch.Tensor]:
     kv_flat = []
-    for keys, values, _ in past_key_values:
-        kv_flat.extend([keys, values])
+    for layer_kv in past_key_values:
+        # layer_kv is tuple (key, value)
+        kv_flat.extend([layer_kv[0], layer_kv[1]])
     return kv_flat
 
 
@@ -85,9 +78,7 @@ def compile_stage_to_vmfb(
 
     extra_args = []
     if low_memory_mode:
-        # Disable MLIR compile-time multi-threading to reduce peak memory
         extra_args.append("--mlir-disable-threading")
-        # Favor minimizing memory during stream partitioning
         extra_args.append("--iree-stream-partitioning-favor=min-peak-memory")
 
     compiled = ireec.compile_str(
@@ -135,7 +126,6 @@ def verify_prefill_vmfb(
     outputs = main_fn(
         prefill_example_inputs["input_ids"].numpy(),
         prefill_example_inputs["attention_mask"].numpy(),
-        prefill_example_inputs["pixel_values"].numpy(),
     )
 
     logits = outputs[0].to_host()

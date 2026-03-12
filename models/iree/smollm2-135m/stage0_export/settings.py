@@ -1,35 +1,24 @@
-"""Configuration for Qwen3-VL stage0 export."""
+"""Configuration for SmolLM2-135M stage0 export."""
 
-MODEL_NAME = "qwen3-vl-2b"
-IMAGE_SIZE = 448
+MODEL_NAME = "smollm2-135m"
 MAX_SEQ_LEN = 512
 MAX_BATCH_SIZE = 4
 TARGET_BACKEND = "llvm-cpu"  # llvm-cpu | cuda | vulkan
 SAVE_MLIR_BYTECODE = True
 EXTERNALIZE_PARAMETERS = True
-PARAM_ARCHIVE_NAME = "qwen3_vl_2b.irpa"
+PARAM_ARCHIVE_NAME = "smollm2_135m.irpa"
 PARAM_SCOPE = "model"
 VERIFY_OUTPUT = True
-IREE_LOW_MEMORY_MODE = True
+IREE_LOW_MEMORY_MODE = False  # Small model, no need for low memory mode
 
 PREFILL_STAGE_NAME = "prefill"
 DECODE_STAGE_NAME = "decode"
 
 EXPORT_LIMITATIONS = [
     (
-        "Fixed image size",
-        f"Only {IMAGE_SIZE}x{IMAGE_SIZE} images supported",
-        "image_grid_thw hardcoded as constant to avoid data-dependent torch.linspace",
-    ),
-    (
         "No streaming generation",
         "Must implement generation loop externally",
         "Exported graph is single forward pass, no control flow",
-    ),
-    (
-        "Deepstack visual fusion disabled",
-        "Slightly lower multimodal fusion quality in early text layers",
-        "Avoids bool-index path in transformers _deepstack_process that exports unsupported builtin ge",
     ),
     (
         "External parameter archive",

@@ -23,12 +23,13 @@ class DecodeStageWrapper(torch.nn.Module):
         self.model = model
         self.num_layers = num_layers
 
-    def forward(self, input_ids, attention_mask, position_ids, *past_kv_flat):
+    def forward(self, input_ids, attention_mask, position_ids, cache_position, *past_kv_flat):
         cache = rebuild_kv_cache(self.num_layers, past_kv_flat)
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            cache_position=cache_position,
             past_key_values=cache,
             use_cache=True,
             return_dict=True,
@@ -56,6 +57,7 @@ def export_decode_stage_mlir(
     input_ids = torch.randint(0, 1000, (batch_size, 1))
     attention_mask = torch.ones(batch_size, seq_len + 1, dtype=torch.long)
     position_ids = torch.tensor([[seq_len]], dtype=torch.long)
+    cache_position = torch.tensor([seq_len], dtype=torch.long)
 
     past_kv_flat = []
     for _ in range(num_layers):
@@ -66,6 +68,7 @@ def export_decode_stage_mlir(
     print(f"  input_ids: {input_ids.shape} (1 new token)")
     print(f"  attention_mask: {attention_mask.shape}")
     print(f"  position_ids: {position_ids.shape}")
+    print(f"  cache_position: {cache_position.shape}")
     print(f"  KV cache: {num_layers} layers x 2 x [{batch_size}, {num_kv_heads}, {seq_len}, {head_dim}]")
 
     batch_dim = Dim.AUTO(min=1, max=max_batch_size)
@@ -77,12 +80,13 @@ def export_decode_stage_mlir(
         {0: batch_dim},
         {0: batch_dim, 1: seq_dim},
         {0: batch_dim},
+        {},
         tuple(kv_dynamic_shapes),
     )
 
     exported = aot.export(
         wrapper,
-        args=(input_ids, attention_mask, position_ids, *past_kv_flat),
+        args=(input_ids, attention_mask, position_ids, cache_position, *past_kv_flat),
         strict_export=True,
         dynamic_shapes=dynamic_shapes,
     )
