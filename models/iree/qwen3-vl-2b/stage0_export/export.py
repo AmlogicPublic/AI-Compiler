@@ -8,31 +8,9 @@ sys.path.insert(0, str(MODELS_ROOT))
 IREE_DIR = Path(__file__).parent
 COMPILED_DIR = IREE_DIR / "compiled"
 
-from settings import (
-    DECODE_STAGE_NAME,
-    EXTERNALIZE_PARAMETERS,
-    IMAGE_SIZE,
-    IREE_COMPILER_THREADS,
-    IREE_LOW_MEMORY_MODE,
-    MAX_BATCH_SIZE,
-    MAX_SEQ_LEN,
-    MODEL_NAME,
-    PARAM_ARCHIVE_NAME,
-    PARAM_SCOPE,
-    PREFILL_STAGE_NAME,
-    SAVE_MLIR_BYTECODE,
-    STAGE_NAME_LIST,
-    TARGET_BACKEND,
-    VERIFY_OUTPUT,
-    print_export_limitations,
-)
-from stage_common import (
-    compile_stage_to_vmfb,
-    create_prefill_example_inputs,
-    externalize_model_parameters,
-    load_model_and_processor,
-    verify_prefill_vmfb,
-)
+from settings import *
+from stage_common import *
+
 from stage_decode import export_decode_stage_mlir
 from stage_prefill import export_prefill_stage_mlir
 
@@ -96,7 +74,6 @@ def main():
             stage_to_vmfb_path[stage_name],
             target_backend=TARGET_BACKEND,
             low_memory_mode=IREE_LOW_MEMORY_MODE,
-            compiler_threads=IREE_COMPILER_THREADS,
         )
 
     if VERIFY_OUTPUT:

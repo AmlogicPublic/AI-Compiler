@@ -68,7 +68,6 @@ def compile_stage_to_vmfb(
     *,
     target_backend: str,
     low_memory_mode: bool,
-    compiler_threads: int,
 ):
     import iree.compiler as ireec
 
@@ -79,9 +78,10 @@ def compile_stage_to_vmfb(
 
     extra_args = []
     if low_memory_mode:
+        # Disable MLIR compile-time multi-threading to reduce peak memory
         extra_args.append("--mlir-disable-threading")
-        if target_backend == "llvm-cpu":
-            extra_args.append(f"--iree-llvmcpu-number-of-threads={compiler_threads}")
+        # Favor minimizing memory during stream partitioning
+        extra_args.append("--iree-stream-partitioning-favor=min-peak-memory")
 
     compiled = ireec.compile_str(
         mlir_bytes,
