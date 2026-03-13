@@ -5,7 +5,7 @@ from threading import Thread
 import torch
 
 MODELS_ROOT = Path(__file__).resolve().parent.parent
-MODELS_DIR = str(MODELS_ROOT / "huggingface")
+MODELS_DIR = str(MODELS_ROOT / "huggingface_models")
 
 MODELS = {
     "bge-micro-v2": "TaylorAI/bge-micro-v2",                    # ~17M embedding
@@ -22,7 +22,7 @@ DIFFUSION_MODELS = {"sd-turbo"}
 
 def _resolve_local_model_dir(name, check_file):
     candidates = [
-        MODELS_ROOT / "huggingface" / name,
+        MODELS_ROOT / "huggingface_models" / name,
         MODELS_ROOT / name,
     ]
     for path in candidates:
@@ -32,7 +32,7 @@ def _resolve_local_model_dir(name, check_file):
 
 
 def download_model(name):
-    """优先使用本地模型目录，缺失时下载到 models/huggingface/name"""
+    """优先使用本地模型目录，缺失时下载到 models/huggingface_models/name"""
     from huggingface_hub import snapshot_download
 
     # diffusion 用 model_index.json, transformers 用 config.json

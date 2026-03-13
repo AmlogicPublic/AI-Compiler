@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import os
 import torch
 from PIL import Image
-from run.shared import download_model
+from huggingface_run.shared import download_model
 
 
 def load_sd_turbo():

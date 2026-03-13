@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from run.shared import generate_with_stream, load_model
+from huggingface_run.shared import generate_with_stream, load_model
 
 
 def generate_stream(model, tokenizer, prompt, max_new_tokens=100, temperature=0.7, top_p=0.9):

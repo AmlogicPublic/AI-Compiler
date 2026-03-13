@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os
 from PIL import Image
-from run.shared import download_model, generate_with_stream
+from huggingface_run.shared import download_model, generate_with_stream
 
 
 def load_qwen_vl():

@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import torch
 import torch.nn.functional as F
-from run.shared import load_model
+from huggingface_run.shared import load_model
 
 
 def mean_pooling(model_output, attention_mask):

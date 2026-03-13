@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from run.shared import StreamingChatSession, load_model
+from huggingface_run.shared import StreamingChatSession, load_model
 
 
 if __name__ == "__main__":
