@@ -136,12 +136,14 @@ def _export_tvm(compiled_dir: Path):
 
     print("\n[5/6] Exporting decode to TVM Relax...")
     decode_ir_path = compiled_dir / DECODE_STAGE_NAME
-    decode_mod, decode_params = export_decode_stage_tvm(
-        model,
-        decode_ir_path,
-        max_batch_size=MAX_BATCH_SIZE,
-        max_seq_len=MAX_SEQ_LEN,
-    )
+    with open(os.devnull, "w") as devnull:
+        with contextlib.redirect_stderr(devnull):
+            decode_mod, decode_params = export_decode_stage_tvm(
+                model,
+                decode_ir_path,
+                max_batch_size=MAX_BATCH_SIZE,
+                max_seq_len=MAX_SEQ_LEN,
+            )
 
     prefill_lib_path = compiled_dir / f"{PREFILL_STAGE_NAME}.so"
     decode_lib_path = compiled_dir / f"{DECODE_STAGE_NAME}.so"
