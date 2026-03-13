@@ -8,7 +8,7 @@ COMPILED_DIR = MODEL_ROOT / "compiler_iree" / "compiled"
 def load_iree_module(vmfb_path: Path, params_path: Path | None = None):
     import iree.runtime as ireert
 
-    assert vmfb_path.exists(), f"VMFB not found: {vmfb_path}\nRun 'python stage0_export/export.py iree' first"
+    assert vmfb_path.exists(), f"VMFB not found: {vmfb_path}\nRun 'python shared/stage0_export/export.py iree' first"
 
     config = ireert.Config("local-task")
     with open(vmfb_path, "rb") as f:

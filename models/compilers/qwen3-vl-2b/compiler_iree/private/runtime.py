@@ -1,5 +1,5 @@
-from stage1_run.settings import IMAGE_PATH, MAX_NEW_TOKENS, MODEL_NAME, QUESTION, TEMPERATURE
-from stage1_run.vl_runtime import load_processor, run_interactive_loop
+from shared.stage1_run.settings import IMAGE_PATH, MAX_NEW_TOKENS, MODEL_NAME, QUESTION, TEMPERATURE
+from shared.stage1_run.vl_runtime import load_processor, run_interactive_loop
 
 from private.backend import COMPILED_DIR, load_iree_module
 

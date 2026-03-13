@@ -1,7 +1,7 @@
 import tvm
 
-from stage1_run.settings import MAX_NEW_TOKENS, MODEL_NAME, PREFILL_SEQ_LEN, PROMPT, TEMPERATURE
-from stage1_run.text_runtime import load_tokenizer, run_interactive_loop
+from shared.stage1_run.settings import MAX_NEW_TOKENS, MODEL_NAME, PREFILL_SEQ_LEN, PROMPT, TEMPERATURE
+from shared.stage1_run.text_runtime import load_tokenizer, run_interactive_loop
 
 from private.backend import (
     COMPILED_DIR,

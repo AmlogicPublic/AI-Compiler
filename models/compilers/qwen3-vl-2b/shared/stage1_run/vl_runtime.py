@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[5]
 MODELS_ROOT = REPO_ROOT / "models"
 sys.path.insert(0, str(MODELS_ROOT))
 

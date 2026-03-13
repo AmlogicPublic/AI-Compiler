@@ -1,29 +1,17 @@
-import importlib.util
 from pathlib import Path
 
 import numpy as np
 import tvm
 from tvm import relax
 
+from shared.stage0_export.stage_common import load_params_for_tvm
 from private import MODEL_ROOT
 
 COMPILED_DIR = MODEL_ROOT / "compiler_tvm" / "compiled"
-STAGE0_EXPORT_DIR = MODEL_ROOT / "stage0_export"
-
-
-def _load_stage_common_module():
-    stage_common_path = STAGE0_EXPORT_DIR / "stage_common.py"
-    assert stage_common_path.exists(), f"Missing stage_common.py: {stage_common_path}"
-    spec = importlib.util.spec_from_file_location("qwen3vl_stage_common", stage_common_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def load_tvm_module(lib_path: Path, device):
-    assert lib_path.exists(), f"Library not found: {lib_path}\nRun 'python stage0_export/export.py tvm' first"
+    assert lib_path.exists(), f"Library not found: {lib_path}\nRun 'python shared/stage0_export/export.py tvm' first"
     ex = tvm.runtime.load_module(str(lib_path))
     return relax.VirtualMachine(ex, device)
 
@@ -31,9 +19,9 @@ def load_tvm_module(lib_path: Path, device):
 def load_params_for_module(lib_path: Path, device) -> list:
     params_path = COMPILED_DIR / "params.npz"
     ir_path = lib_path.with_suffix(".txt")
-    assert params_path.exists(), f"Params not found: {params_path}\nRun 'python stage0_export/export.py tvm' first"
-    assert ir_path.exists(), f"IR not found: {ir_path}\nRun 'python stage0_export/export.py tvm' first"
-    return _load_stage_common_module().load_params_for_tvm(params_path, ir_path, device)
+    assert params_path.exists(), f"Params not found: {params_path}\nRun 'python shared/stage0_export/export.py tvm' first"
+    assert ir_path.exists(), f"IR not found: {ir_path}\nRun 'python shared/stage0_export/export.py tvm' first"
+    return load_params_for_tvm(params_path, ir_path, device)
 
 
 def unpack_tvm_outputs(outputs):

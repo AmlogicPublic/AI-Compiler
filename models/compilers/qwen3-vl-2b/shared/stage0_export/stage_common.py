@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 import torch
 
-MODELS_ROOT = Path(__file__).resolve().parents[3]
+MODELS_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(MODELS_ROOT))
 
 from huggingface_run.shared import download_model
