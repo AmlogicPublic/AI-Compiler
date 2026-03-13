@@ -12,7 +12,7 @@ from transformers.models.qwen3_vl.modeling_qwen3_vl import (
 
 
 class StaticQwen3VLVision(torch.nn.Module):
-    """Fixed-shape vision module for torch.export/IREE."""
+    """Fixed-shape vision module for torch.export backend export."""
 
     def __init__(self, visual, image_grid_thw: torch.Tensor):
         super().__init__()
@@ -20,9 +20,10 @@ class StaticQwen3VLVision(torch.nn.Module):
         self.spatial_merge_size = visual.spatial_merge_size
         self.patch_embed = visual.patch_embed
         self.blocks = visual.blocks
-        self.deepstack_visual_indexes = visual.deepstack_visual_indexes
-        self.deepstack_merger_list = visual.deepstack_merger_list
         self.merger = visual.merger
+        # Deepstack disabled for export (avoids dynamic control flow)
+        self.deepstack_visual_indexes = []
+        self.deepstack_merger_list = torch.nn.ModuleList()
 
         with torch.no_grad():
             pos_embeds = visual.fast_pos_embed_interpolate(image_grid_thw)

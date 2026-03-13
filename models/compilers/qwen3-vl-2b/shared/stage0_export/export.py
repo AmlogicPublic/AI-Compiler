@@ -89,7 +89,7 @@ def _export_iree(compiled_dir: Path):
     prefill_vmfb_path = compiled_dir / f"{PREFILL_STAGE_NAME}.vmfb"
     decode_vmfb_path = compiled_dir / f"{DECODE_STAGE_NAME}.vmfb"
 
-    print("\n[6/7] Compiling prefill to IREE vmfb...")
+    print("\n[6/7] Compiling prefill to vmfb...")
     assert compile_stage_to_vmfb(
         prefill_mlir_path,
         prefill_vmfb_path,
@@ -97,7 +97,7 @@ def _export_iree(compiled_dir: Path):
         low_memory_mode=IREE_LOW_MEMORY_MODE,
     )
 
-    print("\n[7/7] Compiling decode to IREE vmfb...")
+    print("\n[7/7] Compiling decode to vmfb...")
     assert compile_stage_to_vmfb(
         decode_mlir_path,
         decode_vmfb_path,
@@ -122,11 +122,11 @@ def _export_tvm(compiled_dir: Path):
     print("\n[2/7] Creating example inputs...")
     prefill_example_inputs = create_prefill_example_inputs(processor, IMAGE_SIZE)
 
-    print("\n[3/7] Exporting prefill to TVM Relax...")
+    print("\n[3/7] Exporting prefill to Relax...")
     prefill_ir_path = compiled_dir / PREFILL_STAGE_NAME
     prefill_mod, prefill_params = export_prefill_stage_tvm(model, prefill_example_inputs, prefill_ir_path)
 
-    print("\n[4/7] Exporting decode to TVM Relax...")
+    print("\n[4/7] Exporting decode to Relax...")
     decode_ir_path = compiled_dir / DECODE_STAGE_NAME
     decode_mod, decode_params = export_decode_stage_tvm(
         model,
@@ -143,10 +143,10 @@ def _export_tvm(compiled_dir: Path):
     prefill_lib_path = compiled_dir / f"{PREFILL_STAGE_NAME}.so"
     decode_lib_path = compiled_dir / f"{DECODE_STAGE_NAME}.so"
 
-    print("\n[6/7] Compiling prefill to TVM library...")
+    print("\n[6/7] Compiling prefill to library...")
     assert compile_to_tvm_lib(prefill_mod, prefill_params, prefill_lib_path, target=TVM_TARGET)
 
-    print("\n[7/7] Compiling decode to TVM library...")
+    print("\n[7/7] Compiling decode to library...")
     assert compile_to_tvm_lib(decode_mod, decode_params, decode_lib_path, target=TVM_TARGET)
 
     if VERIFY_OUTPUT:
