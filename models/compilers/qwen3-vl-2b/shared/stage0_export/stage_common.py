@@ -79,13 +79,7 @@ def compile_stage_to_vmfb(mlir_path: Path, vmfb_path: Path, *, target_backend: s
     with open(mlir_path, "rb") as f:
         mlir_bytes = f.read()
 
-    extra_args = [
-        "--mlir-disable-threading",
-        "--iree-stream-partitioning-favor=min-peak-memory",
-        "--iree-opt-const-eval=false",
-        "--iree-opt-const-expr-hoisting=false",
-        "--iree-llvmcpu-link-embedded=false",
-    ]
+    extra_args = []
     if target_backend == "llvm-cpu":
         extra_args.append("--iree-llvmcpu-target-cpu=host")
 
