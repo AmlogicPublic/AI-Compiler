@@ -71,7 +71,7 @@ def externalize_model_parameters(model, output_path: Path, param_scope: str):
     return True
 
 
-def compile_stage_to_vmfb(mlir_path: Path, vmfb_path: Path, *, target_backend: str, low_memory_mode: bool):
+def compile_stage_to_vmfb(mlir_path: Path, vmfb_path: Path, *, target_backend: str):
     import iree.compiler as ireec
 
     print(f"  Compiling {mlir_path.name} -> {vmfb_path.name}")
@@ -79,12 +79,15 @@ def compile_stage_to_vmfb(mlir_path: Path, vmfb_path: Path, *, target_backend: s
     with open(mlir_path, "rb") as f:
         mlir_bytes = f.read()
 
-    extra_args = []
+    extra_args = [
+        "--mlir-disable-threading",
+        "--iree-stream-partitioning-favor=min-peak-memory",
+        "--iree-opt-const-eval=false",
+        "--iree-opt-const-expr-hoisting=false",
+        "--iree-llvmcpu-link-embedded=false",
+    ]
     if target_backend == "llvm-cpu":
         extra_args.append("--iree-llvmcpu-target-cpu=host")
-    if low_memory_mode:
-        extra_args.append("--mlir-disable-threading")
-        extra_args.append("--iree-stream-partitioning-favor=min-peak-memory")
 
     compiled = ireec.compile_str(
         mlir_bytes,

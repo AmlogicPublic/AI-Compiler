@@ -1,9 +1,12 @@
 """Qwen3-VL shared export entrypoint. Usage: python export.py [iree|tvm]"""
 
 import logging
+import os
 import sys
 import warnings
 from pathlib import Path
+
+os.environ["TORCH_LOGS"] = "-export"
 
 warnings.filterwarnings("ignore", module="torch._dynamo")
 warnings.filterwarnings("ignore", module="torch._export")
@@ -18,7 +21,6 @@ from settings import (
     DECODE_STAGE_NAME,
     IMAGE_SIZE,
     IREE_EXTERNALIZE_PARAMETERS,
-    IREE_LOW_MEMORY_MODE,
     IREE_PARAM_ARCHIVE_NAME,
     IREE_PARAM_SCOPE,
     IREE_SAVE_MLIR_BYTECODE,
@@ -94,7 +96,6 @@ def _export_iree(compiled_dir: Path):
         prefill_mlir_path,
         prefill_vmfb_path,
         target_backend=IREE_TARGET_BACKEND,
-        low_memory_mode=IREE_LOW_MEMORY_MODE,
     )
 
     print("\n[7/7] Compiling decode to vmfb...")
@@ -102,7 +103,6 @@ def _export_iree(compiled_dir: Path):
         decode_mlir_path,
         decode_vmfb_path,
         target_backend=IREE_TARGET_BACKEND,
-        low_memory_mode=IREE_LOW_MEMORY_MODE,
     )
 
     if VERIFY_OUTPUT:
