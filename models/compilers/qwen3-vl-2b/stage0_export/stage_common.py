@@ -17,6 +17,7 @@ def load_model_and_processor(model_name: str):
     from transformers import AutoModelForImageTextToText, AutoProcessor
 
     local_dir = download_model(model_name)
+    print(f"  Checkpoint source: local HF-format files at {local_dir} (export input only)")
     processor = AutoProcessor.from_pretrained(local_dir, trust_remote_code=True)
     model = AutoModelForImageTextToText.from_pretrained(
         local_dir,
@@ -25,7 +26,7 @@ def load_model_and_processor(model_name: str):
         attn_implementation="eager",
     )
     model.eval()
-    print(f"Model loaded, params: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Model loaded for export, params: {sum(p.numel() for p in model.parameters()):,}")
     return model, processor
 
 

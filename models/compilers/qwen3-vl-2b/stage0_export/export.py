@@ -57,7 +57,7 @@ def main():
     print("=" * 60)
     print_export_limitations(backend)
 
-    print("\n[1/7] Loading model...")
+    print("\n[1/7] Loading local checkpoint for export only (no HF runtime eval)...")
     model, processor = load_model_and_processor(MODEL_NAME)
 
     print("\n[2/7] Creating example inputs...")

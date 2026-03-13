@@ -42,6 +42,7 @@ def load_model_and_tokenizer(model_name: str):
     patch_dynamic_cache_for_export()
 
     local_dir = download_model(model_name)
+    print(f"  Checkpoint source: local HF-format files at {local_dir} (export input only)")
     tokenizer = AutoTokenizer.from_pretrained(local_dir, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -52,7 +53,7 @@ def load_model_and_tokenizer(model_name: str):
         attn_implementation="eager",
     )
     model.eval()
-    print(f"Model loaded, params: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Model loaded for export, params: {sum(p.numel() for p in model.parameters()):,}")
     return model, tokenizer
 
 

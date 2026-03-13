@@ -1,8 +1,6 @@
 """SmolLM2 shared export entrypoint. Usage: python export.py [iree|tvm]"""
 
-import contextlib
 import logging
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -59,7 +57,7 @@ def _backend_from_argv() -> str:
 
 
 def _export_iree(compiled_dir: Path):
-    print("\n[1/6] Loading model...")
+    print("\n[1/6] Loading local checkpoint for export only (no HF runtime eval)...")
     model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
 
     print("\n[2/6] Creating example inputs...")
@@ -80,14 +78,12 @@ def _export_iree(compiled_dir: Path):
 
     print("\n[5/6] Exporting decode to MLIR...")
     decode_mlir_path = compiled_dir / f"{DECODE_STAGE_NAME}.{mlir_suffix}"
-    with open(os.devnull, "w") as devnull:
-        with contextlib.redirect_stderr(devnull):
-            assert export_decode_stage_mlir(
-                model,
-                decode_mlir_path,
-                max_batch_size=MAX_BATCH_SIZE,
-                max_seq_len=MAX_SEQ_LEN,
-            )
+    assert export_decode_stage_mlir(
+        model,
+        decode_mlir_path,
+        max_batch_size=MAX_BATCH_SIZE,
+        max_seq_len=MAX_SEQ_LEN,
+    )
 
     prefill_vmfb_path = compiled_dir / f"{PREFILL_STAGE_NAME}.vmfb"
     decode_vmfb_path = compiled_dir / f"{DECODE_STAGE_NAME}.vmfb"
@@ -119,7 +115,7 @@ def _export_iree(compiled_dir: Path):
 
 
 def _export_tvm(compiled_dir: Path):
-    print("\n[1/6] Loading model...")
+    print("\n[1/6] Loading local checkpoint for export only (no HF runtime eval)...")
     model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
 
     print("\n[2/6] Creating example inputs...")
@@ -136,14 +132,12 @@ def _export_tvm(compiled_dir: Path):
 
     print("\n[5/6] Exporting decode to TVM Relax...")
     decode_ir_path = compiled_dir / DECODE_STAGE_NAME
-    with open(os.devnull, "w") as devnull:
-        with contextlib.redirect_stderr(devnull):
-            decode_mod, decode_params = export_decode_stage_tvm(
-                model,
-                decode_ir_path,
-                max_batch_size=MAX_BATCH_SIZE,
-                max_seq_len=MAX_SEQ_LEN,
-            )
+    decode_mod, decode_params = export_decode_stage_tvm(
+        model,
+        decode_ir_path,
+        max_batch_size=MAX_BATCH_SIZE,
+        max_seq_len=MAX_SEQ_LEN,
+    )
 
     prefill_lib_path = compiled_dir / f"{PREFILL_STAGE_NAME}.so"
     decode_lib_path = compiled_dir / f"{DECODE_STAGE_NAME}.so"
