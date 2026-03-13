@@ -1,0 +1,116 @@
+```
+iree/
+│   ┌─────────────────────────────────────────────────────────────────┐
+│   │  编译流水线: Input → Flow → Stream → HAL → VM → .vmfb           │
+│   │  核心抽象: Dispatch = 一次 GPU kernel / CPU 并行任务            │
+│   └─────────────────────────────────────────────────────────────────┘
+├── compiler/                           # 编译器
+│   ├── src/iree/compiler/
+│   │   ├── Dialect/                    # MLIR 方言（核心抽象层级）
+│   │   │   ├── Flow/                   # [Layer 1] 数据流 - "做什么"
+│   │   │   │   │                       #   tensor 程序 → dispatch region 划分
+│   │   │   │   │                       #   算子融合、数据流分析
+│   │   │   │   ├── IR/                 #   FlowOps.td, FlowTypes.td
+│   │   │   │   └── Transforms/         #   DispatchRegionFormation, Fusion
+│   │   │   ├── Stream/                 # [Layer 2] 异步流 - "何时做"
+│   │   │   │   │                       #   显式调度 + 资源生命周期
+│   │   │   │   │                       #   !stream.resource<transient|variable|constant>
+│   │   │   │   │                       #   !stream.timepoint (类 CUDA event)
+│   │   │   │   ├── IR/                 #   stream.async.execute, stream.cmd.*
+│   │   │   │   └── Transforms/         #   内存规划、别名分析
+│   │   │   ├── HAL/                    # [Layer 3] 硬件抽象 - "在哪做"
+│   │   │   │   │                       #   1:1 映射 HAL C API (类 Vulkan 去掉图形)
+│   │   │   │   │                       #   hal.device / hal.buffer / hal.command_buffer
+│   │   │   │   ├── IR/                 #   HALOps.td, HALTypes.td
+│   │   │   │   ├── Target/             #   TargetBackend.h (后端接口)
+│   │   │   │   └── Transforms/         #   MaterializeInterfaces, SerializeExecutables
+│   │   │   ├── VM/                     # [Layer 4] 虚拟机 - "怎么执行"
+│   │   │   │   │                       #   控制流 + 标量计算（索引、shape）
+│   │   │   │   │                       #   → 字节码 / C / LLVM IR
+│   │   │   │   ├── IR/                 #   VMOps.td, VMOpcodesCore.td
+│   │   │   │   ├── Target/Bytecode/    #   BytecodeEncoder, BytecodeModuleTarget
+│   │   │   │   └── Analysis/           #   RegisterAllocation
+│   │   │   ├── Util/                   #   通用工具方言（global、initializer）
+│   │   │   ├── LinalgExt/              #   Linalg 扩展算子
+│   │   │   ├── Encoding/               #   tensor 编码信息
+│   │   │   └── VMVX/                   #   VM-based 向量扩展
+│   │   ├── Codegen/                    # 代码生成（dispatch → 原生代码）
+│   │   │   ├── Common/                 #   共享优化 pass（tiling、vectorization）
+│   │   │   ├── LLVMCPU/                #   x86/ARM → LLVM IR → .o
+│   │   │   ├── LLVMGPU/                #   CUDA/ROCm → NVPTX/AMDGPU
+│   │   │   ├── SPIRV/                  #   Vulkan/WebGPU → SPIR-V
+│   │   │   ├── VMVX/                   #   纯 VM 执行（无原生代码）
+│   │   │   └── Dialect/                #   iree_codegen 方言（tiling attr 等）
+│   │   ├── GlobalOptimization/         # 全局优化（常量折叠、死代码消除）
+│   │   ├── DispatchCreation/           # dispatch 边界识别 + 融合
+│   │   ├── InputConversion/            # 输入格式标准化
+│   │   ├── ConstEval/                  # 编译期常量求值
+│   │   ├── Preprocessing/              # 前处理（shape 推断等）
+│   │   ├── Pipelines/                  # 完整编译 pipeline 定义
+│   │   └── PluginAPI/                  # 插件接口
+│   ├── plugins/
+│   │   ├── input/                      # 输入格式插件
+│   │   │   ├── StableHLO/              #   JAX/XLA 生态
+│   │   │   ├── Torch/                  #   PyTorch (torch-mlir)
+│   │   │   └── TOSA/                   #   TensorFlow Lite
+│   │   └── target/                     # 目标后端插件
+│   │       ├── LLVMCPU/                #   CPU (x64/ARM)
+│   │       ├── CUDA/                   #   NVIDIA GPU
+│   │       ├── ROCM/                   #   AMD GPU
+│   │       ├── VulkanSPIRV/            #   跨平台 GPU
+│   │       ├── MetalSPIRV/             #   Apple GPU
+│   │       ├── WebGPUSPIRV/            #   浏览器 GPU
+│   │       ├── VMVX/                   #   纯 VM
+│   │       └── Local/                  #   本地 CPU（简化）
+│   └── bindings/
+│       ├── c/                          # C API (iree/compiler/*.h)
+│       └── python/                     # Python API (iree.compiler)
+├── runtime/                            # 运行时
+│   ├── src/iree/
+│   │   ├── hal/                        # 硬件抽象层实现
+│   │   │   ├── drivers/
+│   │   │   │   ├── local_sync/         #   单线程 CPU（调试用）
+│   │   │   │   ├── local_task/         #   多线程 CPU（工作窃取线程池）
+│   │   │   │   ├── cuda/               #   CUDA driver API
+│   │   │   │   ├── hip/                #   ROCm HIP API
+│   │   │   │   ├── vulkan/             #   Vulkan driver
+│   │   │   │   ├── metal/              #   Apple Metal
+│   │   │   │   └── null/               #   空实现（测试）
+│   │   │   ├── local/                  #   本地执行器通用代码
+│   │   │   ├── utils/                  #   HAL 工具函数
+│   │   │   └── cts/                    #   合规测试套件
+│   │   ├── vm/                         # 虚拟机解释器
+│   │   │   │                           #   字节码执行、引用计数
+│   │   │   ├── bytecode/               #   字节码解码
+│   │   │   └── ops*.c                  #   opcode 实现
+│   │   ├── task/                       # 任务调度
+│   │   │   │                           #   工作窃取、嵌套并行
+│   │   │   ├── executor.c
+│   │   │   └── topology.c              #   CPU 拓扑感知
+│   │   ├── io/                         # 参数 I/O
+│   │   │   │                           #   .irpa / safetensors / GGUF
+│   │   │   └── parameter_*.c
+│   │   ├── base/                       # 基础设施（allocator、status、logging）
+│   │   ├── modules/                    # VM 内置模块（hal、io、check）
+│   │   └── schemas/                    # FlatBuffer schema (*.fbs)
+│   └── bindings/python/                # Python 运行时 (iree.runtime)
+├── tools/                              # 命令行工具源码
+│   ├── iree-compile-main.cc            #   主编译入口
+│   ├── iree-run-module-main.c          #   执行 .vmfb
+│   ├── iree-benchmark-module-main.cc   #   性能测试
+│   └── iree-opt-main.cc                #   MLIR pass 调试
+├── build_tools/
+│   ├── cmake/                          # CMake 模块
+│   ├── embed_data/                     # 数据嵌入工具（资源 → C 数组）
+│   ├── llvm/                           # LLVM 依赖配置
+│   └── third_party/                    # 第三方库 CMake 集成
+├── third_party/                        # 头文件依赖
+│   ├── nccl/                           #   NCCL 头文件
+│   ├── rccl/                           #   RCCL 头文件
+│   └── renderdoc/                      #   RenderDoc 调试集成
+├── llvm-external-projects/
+│   └── iree-dialects/                  # LLVM 外部项目（共享方言）
+├── lib/                                # 额外库代码
+├── CMakeLists.txt                      # 主构建文件
+└── .clang-format                       # C++ 代码风格
+```
