@@ -116,22 +116,17 @@ def _export_iree(compiled_dir: Path):
 
 
 def _export_tvm(compiled_dir: Path):
-    print("\n[1/6] Loading local checkpoint for export only (no HF runtime eval)...")
+    print("\n[1/7] Loading local checkpoint for export only (no HF runtime eval)...")
     model, processor = load_model_and_processor(MODEL_NAME)
 
-    print("\n[2/6] Creating example inputs...")
+    print("\n[2/7] Creating example inputs...")
     prefill_example_inputs = create_prefill_example_inputs(processor, IMAGE_SIZE)
 
-    params_path = compiled_dir / TVM_PARAMS_NAME
-    if TVM_SAVE_PARAMS_SEPARATELY:
-        print("\n[3/6] Saving model parameters...")
-        assert save_model_parameters(model, params_path)
-
-    print("\n[4/6] Exporting prefill to TVM Relax...")
+    print("\n[3/7] Exporting prefill to TVM Relax...")
     prefill_ir_path = compiled_dir / PREFILL_STAGE_NAME
     prefill_mod, prefill_params = export_prefill_stage_tvm(model, prefill_example_inputs, prefill_ir_path)
 
-    print("\n[5/6] Exporting decode to TVM Relax...")
+    print("\n[4/7] Exporting decode to TVM Relax...")
     decode_ir_path = compiled_dir / DECODE_STAGE_NAME
     decode_mod, decode_params = export_decode_stage_tvm(
         model,
@@ -140,13 +135,18 @@ def _export_tvm(compiled_dir: Path):
         max_seq_len=MAX_SEQ_LEN,
     )
 
+    params_path = compiled_dir / TVM_PARAMS_NAME
+    if TVM_SAVE_PARAMS_SEPARATELY:
+        print("\n[5/7] Saving model parameters...")
+        assert save_model_parameters(model, params_path)
+
     prefill_lib_path = compiled_dir / f"{PREFILL_STAGE_NAME}.so"
     decode_lib_path = compiled_dir / f"{DECODE_STAGE_NAME}.so"
 
-    print("\n[6/6] Compiling prefill to TVM library...")
+    print("\n[6/7] Compiling prefill to TVM library...")
     assert compile_to_tvm_lib(prefill_mod, prefill_params, prefill_lib_path, target=TVM_TARGET)
 
-    print("\n[6/6] Compiling decode to TVM library...")
+    print("\n[7/7] Compiling decode to TVM library...")
     assert compile_to_tvm_lib(decode_mod, decode_params, decode_lib_path, target=TVM_TARGET)
 
     if VERIFY_OUTPUT:

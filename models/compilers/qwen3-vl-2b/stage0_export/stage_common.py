@@ -137,8 +137,8 @@ def verify_prefill_vmfb(vmfb_path: Path, prefill_example_inputs, *, params_path:
 
 def save_model_parameters(model, output_path: Path):
     params = {}
-    for name, param in model.named_parameters():
-        params[name.replace(".", "_")] = param.detach().cpu().numpy()
+    for name, value in model.state_dict().items():
+        params[name.replace(".", "_")] = value.detach().cpu().numpy()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(str(output_path), **params)
