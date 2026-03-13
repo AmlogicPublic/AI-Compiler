@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import onnx
 import tvm
 from tvm import relax
 
@@ -16,6 +17,16 @@ from huggingface_run.shared import download_model
 
 TVM_DIR = Path(__file__).parent
 COMPILED_DIR = TVM_DIR / "stage0_export" / "compiled"
+
+
+def load_params_from_onnx(onnx_path: Path, device) -> list:
+    """Load params from ONNX in the order they appear as initializers."""
+    model = onnx.load(str(onnx_path))
+    params = []
+    for init in model.graph.initializer:
+        arr = onnx.numpy_helper.to_array(init)
+        params.append(tvm.nd.array(arr, device))
+    return params
 
 # ===================== User Macros =====================
 MODEL_NAME = "smollm2-135m"
@@ -64,6 +75,14 @@ class SmolLM2TVMRunner:
         assert decode_lib.exists(), f"Run 'python stage0_export/export.py' first: {decode_lib}"
         self.decode_vm = load_tvm_module(decode_lib, self.device)
 
+        # Load params from ONNX (weights are external now)
+        prefill_onnx = COMPILED_DIR / "prefill.onnx"
+        decode_onnx = COMPILED_DIR / "decode.onnx"
+        print("Loading params from ONNX...")
+        self.prefill_params = load_params_from_onnx(prefill_onnx, self.device)
+        self.decode_params = load_params_from_onnx(decode_onnx, self.device)
+        print(f"  Prefill params: {len(self.prefill_params)}, Decode params: {len(self.decode_params)}")
+
         print("TVM runner ready")
 
     def prepare_inputs(self, prompt: str):
@@ -77,10 +96,11 @@ class SmolLM2TVMRunner:
 
     def forward_prefill(self, inputs: dict):
         """Prefill: prompt → logits + KV cache"""
-        input_ids_tvm = tvm.nd.array(inputs["input_ids"], device=self.device)
-        attention_mask_tvm = tvm.nd.array(inputs["attention_mask"], device=self.device)
+        input_ids_tvm = tvm.runtime.from_dlpack(inputs["input_ids"])
+        attention_mask_tvm = tvm.runtime.from_dlpack(inputs["attention_mask"])
 
-        outputs = self.prefill_vm["main"](input_ids_tvm, attention_mask_tvm)
+        # Weights are passed as additional arguments after inputs
+        outputs = self.prefill_vm["main"](input_ids_tvm, attention_mask_tvm, *self.prefill_params)
 
         # outputs: (logits, k0, v0, k1, v1, ...)
         if isinstance(outputs, (list, tuple)):
@@ -93,14 +113,15 @@ class SmolLM2TVMRunner:
 
     def forward_decode(self, input_ids, attention_mask, position_ids, cache_position, kv_cache):
         """Decode: 1 token + KV cache → logits + new KV cache"""
-        input_ids_tvm = tvm.nd.array(input_ids, device=self.device)
-        attention_mask_tvm = tvm.nd.array(attention_mask, device=self.device)
-        position_ids_tvm = tvm.nd.array(position_ids, device=self.device)
-        cache_position_tvm = tvm.nd.array(cache_position, device=self.device)
-        kv_cache_tvm = [tvm.nd.array(kv, device=self.device) for kv in kv_cache]
+        input_ids_tvm = tvm.runtime.from_dlpack(input_ids)
+        attention_mask_tvm = tvm.runtime.from_dlpack(attention_mask)
+        position_ids_tvm = tvm.runtime.from_dlpack(position_ids)
+        cache_position_tvm = tvm.runtime.from_dlpack(cache_position)
+        kv_cache_tvm = [tvm.runtime.from_dlpack(kv) for kv in kv_cache]
 
+        # Weights are passed as additional arguments after inputs
         outputs = self.decode_vm["main"](
-            input_ids_tvm, attention_mask_tvm, position_ids_tvm, cache_position_tvm, *kv_cache_tvm
+            input_ids_tvm, attention_mask_tvm, position_ids_tvm, cache_position_tvm, *kv_cache_tvm, *self.decode_params
         )
 
         if isinstance(outputs, (list, tuple)):

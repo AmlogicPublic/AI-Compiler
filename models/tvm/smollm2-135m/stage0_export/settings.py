@@ -3,7 +3,7 @@
 MODEL_NAME = "smollm2-135m"
 MAX_SEQ_LEN = 512
 MAX_BATCH_SIZE = 4
-TARGET = "llvm"  # llvm | cuda | vulkan | metal
+TARGET = {"kind": "llvm", "mtriple": "x86_64-linux-gnu"}
 SAVE_PARAMS_SEPARATELY = True
 VERIFY_OUTPUT = True
 

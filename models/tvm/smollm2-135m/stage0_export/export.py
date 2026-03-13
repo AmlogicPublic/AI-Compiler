@@ -1,5 +1,5 @@
 """SmolLM2-135M -> TVM export entrypoint.
-Path: torch.export -> TVM Relax -> compiled library
+Path: torch.jit.trace -> TVM Relay -> compiled library
 """
 
 import logging
@@ -7,7 +7,8 @@ import sys
 import warnings
 from pathlib import Path
 
-# Suppress third-party library warnings
+import tvm
+
 warnings.filterwarnings("ignore", module="torch._dynamo")
 warnings.filterwarnings("ignore", module="torch._export")
 warnings.filterwarnings("ignore", category=FutureWarning, module="copyreg")
@@ -35,7 +36,7 @@ from stage_prefill import export_prefill_stage_tvm
 
 def main():
     print("=" * 60)
-    print("SmolLM2-135M -> TVM Export")
+    print("SmolLM2-135M -> TVM Export (Relay)")
     print(f"  target: {TARGET}")
     print("=" * 60)
 
@@ -54,13 +55,13 @@ def main():
     else:
         params_path = None
 
-    print("\n[4/6] Exporting prefill to TVM Relax...")
+    print("\n[4/6] Exporting prefill to TVM Relay...")
     prefill_ir_path = COMPILED_DIR / PREFILL_STAGE_NAME
     prefill_mod, prefill_params = export_prefill_stage_tvm(
         model, prefill_example_inputs, prefill_ir_path
     )
 
-    print("\n[5/6] Exporting decode to TVM Relax...")
+    print("\n[5/6] Exporting decode to TVM Relay...")
     decode_ir_path = COMPILED_DIR / DECODE_STAGE_NAME
     decode_mod, decode_params = export_decode_stage_tvm(
         model,
