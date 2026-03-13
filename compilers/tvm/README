@@ -1,0 +1,170 @@
+```
+tvm/
+│   ┌─────────────────────────────────────────────────────────────────┐
+│   │  编译流水线: Relax (图) → TIR (循环) → Target Code            │
+│   │  核心抽象: Schedule = 分离算法与优化策略                       │
+│   └─────────────────────────────────────────────────────────────────┘
+├── include/tvm/                        # C++ 头文件
+│   ├── relax/                          # [Layer 1] 图级 IR（取代 Relay）
+│   │   │                               #   计算图表示、类型推断
+│   │   │                               #   StructInfo = 静态/动态 shape 信息
+│   │   ├── expr.h                      #   Relax 表达式（Function, Call, Var）
+│   │   ├── struct_info.h               #   结构信息（TensorStructInfo, ShapeStructInfo）
+│   │   ├── block_builder.h             #   IR 构建器（顺序构建 binding）
+│   │   ├── dataflow_pattern.h          #   模式匹配（用于图重写）
+│   │   ├── transform.h                 #   图级变换 pass
+│   │   ├── attrs/                      #   算子属性定义
+│   │   └── distributed/                #   分布式张量（DTensor）
+│   ├── tir/                            # [Layer 2] 循环级 IR
+│   │   │                               #   显式循环、内存访问
+│   │   │                               #   PrimFunc = 可编译的原子函数
+│   │   ├── expr.h                      #   TIR 表达式（Var, Load, Call）
+│   │   ├── stmt.h                      #   TIR 语句（For, Store, Allocate）
+│   │   ├── function.h                  #   PrimFunc 定义
+│   │   ├── op.h                        #   内置算子（tir.add, tir.exp 等）
+│   │   ├── buffer.h                    #   Buffer 抽象
+│   │   └── schedule.h                  #   Schedule 原语
+│   ├── s_tir/                          # Schedulable TIR（可调度 TIR）
+│   │   │                               #   基于 block/loop 的调度系统
+│   │   ├── stmt.h                      #   SBlock, SIter, SLoop
+│   │   ├── schedule/                   #   调度原语（split, reorder, compute_at）
+│   │   └── meta_schedule/              #   自动调度（搜索最优 schedule）
+│   │       ├── schedule_rule.h         #     调度规则
+│   │       ├── postproc.h              #     后处理
+│   │       └── cost_model.h            #     性能模型（XGBoost）
+│   ├── te/                             # Tensor Expression
+│   │   │                               #   声明式算子定义 DSL
+│   │   │                               #   te.compute() → 隐式 TIR
+│   │   ├── operation.h                 #   ComputeOp, PlaceholderOp
+│   │   └── tensor.h                    #   Tensor 定义
+│   ├── topi/                           # Tensor Operator Inventory
+│   │   │                               #   预定义算子库
+│   │   ├── nn/                         #   conv2d, dense, pooling
+│   │   ├── reduction.h                 #   sum, max, min
+│   │   └── transform.h                 #   reshape, transpose
+│   ├── arith/                          # 算术分析
+│   │   │                               #   符号简化、bound 推断
+│   │   ├── analyzer.h                  #   Analyzer 接口
+│   │   ├── int_set.h                   #   整数集合（range 分析）
+│   │   └── pattern.h                   #   模式匹配（算术简化）
+│   ├── ir/                             # 通用 IR 基础设施
+│   │   ├── expr.h                      #   基础表达式类型
+│   │   ├── type.h                      #   类型系统
+│   │   ├── module.h                    #   IRModule（顶层容器）
+│   │   ├── transform.h                 #   Pass 基础设施
+│   │   └── diagnostic.h                #   错误报告
+│   ├── target/                         # 目标后端
+│   │   ├── target.h                    #   Target 定义（llvm, cuda, rocm）
+│   │   ├── codegen.h                   #   代码生成接口
+│   │   └── source_compiler.h           #   源码编译（调用 nvcc 等）
+│   ├── runtime/                        # 运行时头文件
+│   │   ├── module.h                    #   Module 加载/执行
+│   │   ├── device_api.h                #   设备抽象
+│   │   ├── tensor.h                    #   NDArray/DLTensor
+│   │   ├── disco/                      #   分布式执行（Disco）
+│   │   └── vm/                         #   Relax VM
+│   ├── node/                           #   Object 系统
+│   │   ├── cast.h                      #     类型转换
+│   │   └── structural_equal.h          #     结构相等
+│   ├── script/                         # TVMScript
+│   │   ├── ir_builder/                 #   Python DSL → IR
+│   │   └── printer/                    #   IR → Python DSL
+│   └── support/                        # 工具函数
+├── src/                                # C++ 实现
+│   ├── relax/
+│   │   ├── ir/                         #   Relax IR 实现
+│   │   ├── op/                         #   Relax 算子注册
+│   │   ├── transform/                  #   图级变换
+│   │   │   ├── fuse_ops.cc             #     算子融合
+│   │   │   ├── lower_to_tir.cc         #     Relax → TIR
+│   │   │   └── legalize_ops.cc         #     算子合法化
+│   │   ├── backend/                    #   后端支持
+│   │   │   └── vm_codegen.cc           #     VM 代码生成
+│   │   └── distributed/                #   分布式支持
+│   ├── tir/
+│   │   ├── ir/                         #   TIR IR 实现
+│   │   ├── transform/                  #   循环变换
+│   │   │   ├── loop_partition.cc       #     循环分割
+│   │   │   ├── vectorize.cc            #     向量化
+│   │   │   ├── unroll.cc               #     循环展开
+│   │   │   └── storage_flatten.cc      #     存储扁平化
+│   │   └── analysis/                   #   TIR 分析
+│   ├── s_tir/
+│   │   ├── schedule/                   #   调度实现
+│   │   ├── transform/                  #   S_TIR 变换
+│   │   └── meta_schedule/              #   自动调度
+│   │       ├── search_strategy.cc      #     搜索策略
+│   │       └── runner.cc               #     执行器
+│   ├── te/
+│   │   └── operation/                  #   TE 算子实现
+│   ├── topi/                           #   预定义算子实现
+│   ├── target/                         # 代码生成
+│   │   ├── source/                     #   源码生成器
+│   │   │   ├── codegen_c.cc            #     C 代码生成
+│   │   │   ├── codegen_cuda.cc         #     CUDA 代码生成
+│   │   │   └── codegen_opencl.cc       #     OpenCL 代码生成
+│   │   ├── llvm/                       #   LLVM 代码生成
+│   │   │   └── codegen_llvm.cc
+│   │   └── build_common.cc             #   编译调用
+│   ├── runtime/                        # 运行时实现
+│   │   ├── cpu/                        #   CPU 后端
+│   │   ├── cuda/                       #   CUDA 后端
+│   │   ├── rocm/                       #   ROCm 后端
+│   │   ├── vulkan/                     #   Vulkan 后端
+│   │   ├── metal/                      #   Metal 后端
+│   │   ├── opencl/                     #   OpenCL 后端
+│   │   ├── graph_executor/             #   图执行器（旧 API）
+│   │   ├── vm/                         #   Relax VM
+│   │   └── disco/                      #   分布式执行
+│   ├── ir/                             #   通用 IR 实现
+│   ├── arith/                          #   算术分析实现
+│   ├── node/                           #   Object 系统实现
+│   └── script/                         #   TVMScript 实现
+├── python/tvm/                         # Python 前端
+│   ├── relax/                          # Relax Python API
+│   │   ├── op/                         #   算子接口（nn, math, memory）
+│   │   ├── transform/                  #   变换 pass
+│   │   ├── frontend/                   #   前端导入（ONNX, PyTorch）
+│   │   └── testing/                    #   测试工具
+│   ├── tir/                            # TIR Python API
+│   │   ├── function.py                 #   PrimFunc
+│   │   └── transform.py                #   TIR 变换
+│   ├── s_tir/                          # S_TIR Python API
+│   │   ├── schedule.py                 #   Schedule
+│   │   └── meta_schedule/              #   自动调度
+│   │       ├── tune.py                 #     调优入口
+│   │       └── database.py             #     调优结果数据库
+│   ├── te/                             # TE Python API
+│   │   ├── tensor.py                   #   te.placeholder, te.compute
+│   │   └── schedule.py                 #   手动调度（旧 API）
+│   ├── topi/                           # TOPI Python API
+│   │   ├── nn/                         #   神经网络算子
+│   │   ├── cuda/                       #   CUDA 特化
+│   │   └── x86/                        #   x86 特化
+│   ├── script/                         # TVMScript
+│   │   │                               #   Python DSL 写 TIR/Relax
+│   │   ├── tir.py                      #   @T.prim_func
+│   │   └── relax.py                    #   @R.function
+│   ├── target/                         # Target 配置
+│   │   └── target.py                   #   Target("cuda", "llvm -mcpu=...")
+│   ├── runtime/                        # 运行时 Python API
+│   │   ├── module.py                   #   加载/执行模块
+│   │   └── ndarray.py                  #   NDArray
+│   ├── driver/                         # 编译驱动
+│   │   └── build_module.py             #   tvm.build()
+│   ├── contrib/                        # 第三方集成
+│   │   ├── cutlass/                    #   CUTLASS 集成
+│   │   ├── cudnn.py                    #   cuDNN 调用
+│   │   └── cublas.py                   #   cuBLAS 调用
+│   └── ir/                             # 通用 IR Python API
+├── cmake/                              # CMake 构建
+│   ├── config.cmake                    #   构建选项模板
+│   ├── modules/                        #   CMake 模块
+│   └── utils/                          #   工具脚本
+├── 3rdparty/                           # 第三方依赖
+│   ├── compiler-rt/                    #   fp16 支持
+│   ├── nvbench/                        #   CUDA 性能测试
+│   └── tensorrt_llm/                   #   TensorRT-LLM 算子
+├── CMakeLists.txt                      # 主构建文件
+└── .clang-format                       # C++ 代码风格
+```
