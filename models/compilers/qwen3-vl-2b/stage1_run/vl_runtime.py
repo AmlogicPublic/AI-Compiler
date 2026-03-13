@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -61,12 +62,55 @@ def create_demo_image(path: str) -> str:
     return path
 
 
-def run_interactive_loop(runner, *, image_path: str, question: str, max_new_tokens: int, temperature: float):
+def generate_response(runner, image, question: str, max_new_tokens: int, temperature: float) -> str:
+    inputs = prepare_inputs(runner.processor, image, question)
+    seq_len = inputs["input_ids"].shape[1]
+
+    t0 = time.perf_counter()
+    logits, kv_cache = runner.forward_prefill(inputs)
+    prefill_time = time.perf_counter() - t0
+    print(f"  Prefill: {prefill_time:.2f}s, seq_len={seq_len}")
+
+    generated_ids = []
+    next_token = sample_next_token(logits, temperature)
+    generated_ids.append(next_token)
+
+    if max_new_tokens > 1:
+        t0 = time.perf_counter()
+        for step in range(1, max_new_tokens):
+            if next_token == runner.eos_token_id:
+                break
+
+            input_ids = np.array([[next_token]], dtype=np.int64)
+            position_ids = np.array([[seq_len + step - 1]], dtype=np.int64)
+            attention_mask = np.ones((1, seq_len + step), dtype=np.int64)
+
+            logits, kv_cache = runner.forward_decode(input_ids, attention_mask, position_ids, kv_cache)
+            next_token = sample_next_token(logits, temperature)
+            generated_ids.append(next_token)
+
+        decode_time = time.perf_counter() - t0
+        tokens_decoded = len(generated_ids) - 1
+        if tokens_decoded > 0:
+            print(f"  Decode: {decode_time:.2f}s, {tokens_decoded} tokens, {tokens_decoded / decode_time:.1f} tok/s")
+
+    return runner.tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+
+def run_interactive_loop(
+    runner,
+    *,
+    demo_image_dir: Path,
+    image_path: str,
+    question: str,
+    max_new_tokens: int,
+    temperature: float,
+):
     print("=" * 60)
     print("Qwen3-VL-2B IREE Inference")
     print("=" * 60)
 
-    demo_img = str(runner.model_root / "iree" / "demo_image.png")
+    demo_img = str(demo_image_dir / "demo_image.png")
     if not os.path.exists(demo_img):
         create_demo_image(demo_img)
 
@@ -75,7 +119,7 @@ def run_interactive_loop(runner, *, image_path: str, question: str, max_new_toke
 
     print(f"\n[Image] {current_image}")
     print(f"[Question] {question}")
-    response = runner.generate(image, question, max_new_tokens=max_new_tokens, temperature=temperature)
+    response = generate_response(runner, image, question, max_new_tokens=max_new_tokens, temperature=temperature)
     print(f"[Response] {response}")
 
     print("\n" + "=" * 60)
@@ -104,7 +148,7 @@ def run_interactive_loop(runner, *, image_path: str, question: str, max_new_toke
             image = Image.open(current_image).convert("RGB")
             print(f"\n[Image] {current_image}")
             print(f"[Question] {question}")
-            response = runner.generate(image, question, max_new_tokens=max_new_tokens, temperature=temperature)
+            response = generate_response(runner, image, question, max_new_tokens=max_new_tokens, temperature=temperature)
             print(f"[Response] {response}")
         except KeyboardInterrupt:
             print("\nExit")

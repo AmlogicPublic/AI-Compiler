@@ -1,7 +1,7 @@
 from pathlib import Path
 
+from private import MODEL_ROOT
 
-MODEL_ROOT = Path(__file__).resolve().parents[2]
 COMPILED_DIR = MODEL_ROOT / "compiler_iree" / "compiled"
 
 

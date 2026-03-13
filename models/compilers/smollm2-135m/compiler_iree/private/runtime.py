@@ -1,9 +1,3 @@
-import sys
-from pathlib import Path
-
-MODEL_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(MODEL_ROOT))
-
 from stage1_run.settings import MAX_NEW_TOKENS, MODEL_NAME, PREFILL_SEQ_LEN, PROMPT, TEMPERATURE
 from stage1_run.text_runtime import load_tokenizer, run_interactive_loop
 

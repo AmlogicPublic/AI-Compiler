@@ -5,8 +5,8 @@ import numpy as np
 import tvm
 from tvm import relax
 
+from private import MODEL_ROOT
 
-MODEL_ROOT = Path(__file__).resolve().parents[2]
 COMPILED_DIR = MODEL_ROOT / "compiler_tvm" / "compiled"
 STAGE0_EXPORT_DIR = MODEL_ROOT / "stage0_export"
 
