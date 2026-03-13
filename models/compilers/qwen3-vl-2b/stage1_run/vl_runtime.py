@@ -100,6 +100,7 @@ def generate_response(runner, image, question: str, max_new_tokens: int, tempera
 def run_interactive_loop(
     runner,
     *,
+    title: str,
     demo_image_dir: Path,
     image_path: str,
     question: str,
@@ -107,7 +108,7 @@ def run_interactive_loop(
     temperature: float,
 ):
     print("=" * 60)
-    print("Qwen3-VL-2B IREE Inference")
+    print(title)
     print("=" * 60)
 
     demo_img = str(demo_image_dir / "demo_image.png")

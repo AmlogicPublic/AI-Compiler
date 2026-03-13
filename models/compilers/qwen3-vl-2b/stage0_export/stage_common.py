@@ -4,6 +4,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 import torch
 
@@ -130,5 +131,92 @@ def verify_prefill_vmfb(vmfb_path: Path, prefill_example_inputs, *, params_path:
     logits = outputs[0].to_host()
     print(f"  Logits shape: {logits.shape}")
     print(f"  KV cache: {len(outputs) - 1} tensors")
+    print(f"  Logits sample: {logits[0, -1, :5]}")
+    return True
+
+
+def save_model_parameters(model, output_path: Path):
+    params = {}
+    for name, param in model.named_parameters():
+        params[name.replace(".", "_")] = param.detach().cpu().numpy()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(str(output_path), **params)
+    print(f"  Saved parameters: {output_path}")
+    return True
+
+
+def compile_to_tvm_lib(mod, params: dict, lib_path: Path, *, target: dict):
+    import tvm
+    from tvm import relax
+
+    print(f"  Compiling to {lib_path.name}...")
+    t0 = time.perf_counter()
+    target_obj = tvm.target.Target(target)
+
+    with tvm.transform.PassContext(opt_level=3):
+        ex = relax.build(mod, target=target_obj)
+
+    lib_path.parent.mkdir(parents=True, exist_ok=True)
+    ex.export_library(str(lib_path))
+
+    elapsed = time.perf_counter() - t0
+    print(f"  Compiled in {elapsed:.1f}s: {lib_path}")
+    return True
+
+
+def load_params_for_tvm(params_path: Path, ir_path: Path, device):
+    import re
+    import tvm
+
+    assert params_path.exists(), f"Params not found: {params_path}"
+    assert ir_path.exists(), f"IR not found: {ir_path}"
+
+    npz_data = np.load(str(params_path))
+    with open(ir_path, "r") as f:
+        ir_text = f.read()
+
+    param_names = re.compile(r"(p_model_[a-zA-Z0-9_]+):\s*R\.Tensor").findall(ir_text)
+
+    params_tvm = []
+    tied_lm_head_key = "model_embed_tokens_weight"
+    for pname in param_names:
+        npz_key = pname[2:]
+        if npz_key not in npz_data and npz_key.startswith("model_model_"):
+            npz_key = "model_" + npz_key[len("model_model_"):]
+        if npz_key not in npz_data and npz_key == "model_lm_head_weight":
+            assert tied_lm_head_key in npz_data
+            npz_key = tied_lm_head_key
+        assert npz_key in npz_data, f"Param {npz_key} not in npz (from IR: {pname})"
+        params_tvm.append(tvm.runtime.tensor(npz_data[npz_key], device=device))
+
+    return params_tvm
+
+
+def verify_prefill_lib(lib_path: Path, prefill_example_inputs, *, params_path: Path):
+    import tvm
+    from tvm import relax
+
+    print(f"  Verifying {lib_path.name}...")
+
+    ex = tvm.runtime.load_module(str(lib_path))
+    device = tvm.cpu()
+    vm = relax.VirtualMachine(ex, device)
+
+    input_ids_tvm = tvm.runtime.tensor(prefill_example_inputs["input_ids"].numpy(), device=device)
+    attention_mask_tvm = tvm.runtime.tensor(prefill_example_inputs["attention_mask"].numpy(), device=device)
+    pixel_values_tvm = tvm.runtime.tensor(prefill_example_inputs["pixel_values"].numpy(), device=device)
+
+    params_tvm = load_params_for_tvm(params_path, lib_path.with_suffix(".txt"), device)
+    outputs = vm["main"](input_ids_tvm, attention_mask_tvm, pixel_values_tvm, *params_tvm)
+
+    if hasattr(outputs, "numpy"):
+        logits = outputs.numpy()
+    else:
+        assert len(outputs) > 0
+        first_output = outputs[0]
+        logits = first_output.numpy() if hasattr(first_output, "numpy") else first_output.asnumpy()
+
+    print(f"  Logits shape: {logits.shape}")
     print(f"  Logits sample: {logits[0, -1, :5]}")
     return True

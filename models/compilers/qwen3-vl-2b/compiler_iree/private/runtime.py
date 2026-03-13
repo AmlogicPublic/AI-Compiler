@@ -38,6 +38,7 @@ def main():
     runner = Qwen3VLIREERunner()
     run_interactive_loop(
         runner,
+        title="Qwen3-VL-2B IREE Inference",
         demo_image_dir=COMPILED_DIR.parent,
         image_path=IMAGE_PATH,
         question=QUESTION,

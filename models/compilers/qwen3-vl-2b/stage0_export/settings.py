@@ -8,7 +8,7 @@ MAX_BATCH_SIZE = 4
 PREFILL_STAGE_NAME = "prefill"
 DECODE_STAGE_NAME = "decode"
 
-SUPPORTED_BACKENDS = {"iree"}
+SUPPORTED_BACKENDS = {"iree", "tvm"}
 VERIFY_OUTPUT = True
 
 IREE_TARGET_BACKEND = "llvm-cpu"  # llvm-cpu | cuda | vulkan
@@ -17,6 +17,10 @@ IREE_EXTERNALIZE_PARAMETERS = True
 IREE_PARAM_ARCHIVE_NAME = "qwen3_vl_2b.irpa"
 IREE_PARAM_SCOPE = "model"
 IREE_LOW_MEMORY_MODE = True
+
+TVM_TARGET = {"kind": "llvm", "mtriple": "x86_64-linux-gnu"}
+TVM_SAVE_PARAMS_SEPARATELY = True
+TVM_PARAMS_NAME = "params.npz"
 
 
 def print_export_limitations(backend: str) -> None:
@@ -44,6 +48,14 @@ def print_export_limitations(backend: str) -> None:
                 "External parameter archive",
                 f"Requires loading {IREE_PARAM_ARCHIVE_NAME} at runtime",
                 "Model parameters are externalized to keep MLIR compact",
+            )
+        )
+    else:
+        limitations.append(
+            (
+                "Separate parameter file",
+                f"Requires loading {TVM_PARAMS_NAME} at runtime",
+                "Model parameters are saved separately to keep compiled lib small",
             )
         )
 

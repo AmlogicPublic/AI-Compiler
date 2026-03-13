@@ -58,3 +58,34 @@ def export_prefill_stage_mlir(model, prefill_example_inputs, prefill_mlir_path):
     print(f"  Saved: {prefill_mlir_path}")
     print(f"  Output: logits + {num_layers * 2} KV tensors")
     return True
+
+
+def export_prefill_stage_tvm(model, prefill_example_inputs, output_path):
+    from tvm.relax.frontend.torch import from_exported_program  # type: ignore
+
+    os.environ["TRANSFORMERS_DISABLE_TORCH_CHECK"] = "1"
+    num_layers, num_kv_heads, head_dim = get_text_model_dims(model)
+    print(f"  Model config: {num_layers} layers, {num_kv_heads} KV heads, {head_dim} head_dim")
+
+    input_ids = prefill_example_inputs["input_ids"]
+    attention_mask = prefill_example_inputs["attention_mask"]
+    pixel_values = prefill_example_inputs["pixel_values"]
+    image_grid_thw = prefill_example_inputs["image_grid_thw"]
+
+    wrapper = PrefillStageWrapper(model, image_grid_thw)
+    wrapper.eval()
+
+    with torch.no_grad():
+        exported = torch.export.export(
+            wrapper,
+            args=(input_ids, attention_mask, pixel_values),
+            strict=False,
+        )
+
+    mod = from_exported_program(exported, keep_params_as_input=True)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path.with_suffix(".txt"), "w") as f:
+        f.write(str(mod))
+    print(f"  Saved IR: {output_path.with_suffix('.txt')}")
+    print(f"  Output: logits + {num_layers * 2} KV tensors")
+    return mod, {}
